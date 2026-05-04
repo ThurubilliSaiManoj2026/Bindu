@@ -127,7 +127,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
@@ -187,6 +186,8 @@ examples/.bindu/public.pem
 examples/agent_swarm/.bindu/private.pem
 examples/agent_swarm/.bindu/public.pem
 
+examples/typescript-openai-agent/logs/
+
 # Pebbling keys (DID private/public keys)
 examples/.pebbling/*
 **/.pebbling/private.pem
@@ -201,3 +202,26 @@ bindu/_version.py
 bindu/penguin/.bindu/private.pem
 bindu/penguin/.bindu/public.pem
 .bindu/
+
+# Claude Code worktrees (local agent scratch space, not for version control)
+.claude/worktrees/
+
+postman/*
+node_modules/
+**/node_modules/
+
+# TypeScript SDK
+sdks/typescript/dist/
+sdks/typescript/node_modules/
+
+# Kotlin SDK
+sdks/kotlin/build/
+sdks/kotlin/.gradle/
+sdks/kotlin/bin/
+examples/gateway_test_fleet/pids/
+examples/gateway_test_fleet/logs/
+examples/gateway_test_fleet/.fleet.env
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+config.bat

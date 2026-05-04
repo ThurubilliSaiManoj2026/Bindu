@@ -1,3 +1,12 @@
+# |---------------------------------------------------------|
+# |                                                         |
+# |                 Give Feedback / Get Help                |
+# | https://github.com/getbindu/Bindu/issues/new/choose    |
+# |                                                         |
+# |---------------------------------------------------------|
+#
+#  Thank you users! We ❤️ you! - 🌻
+
 """Sentry integration for error tracking and performance monitoring.
 
 This module provides Sentry initialization and configuration for the Bindu framework.
@@ -22,6 +31,9 @@ from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.observability.sentry")
+
+# HTTP 5xx server error status codes to track as failed requests
+HTTP_5XX_STATUS_CODES = set(range(500, 512))
 
 
 def init_sentry() -> bool:
@@ -56,20 +68,7 @@ def init_sentry() -> bool:
             integrations.append(
                 StarletteIntegration(
                     transaction_style="url",  # Group by URL pattern
-                    failed_request_status_codes={
-                        500,
-                        501,
-                        502,
-                        503,
-                        504,
-                        505,
-                        506,
-                        507,
-                        508,
-                        509,
-                        510,
-                        511,
-                    },  # Track 5xx as errors
+                    failed_request_status_codes=HTTP_5XX_STATUS_CODES,
                 )
             )
 
@@ -99,7 +98,8 @@ def init_sentry() -> bool:
         if not server_name:
             try:
                 server_name = socket.gethostname()
-            except Exception:
+            except OSError as error:
+                logger.warning("Failed to detect hostname", error=str(error))
                 server_name = "unknown"
 
         # Build default tags
@@ -140,11 +140,11 @@ def init_sentry() -> bool:
 
         return True
 
-    except ImportError as e:
-        logger.error("Failed to import Sentry SDK", error=str(e))
+    except ImportError as error:
+        logger.error("Failed to import Sentry SDK", error=str(error))
         return False
-    except Exception as e:
-        logger.error("Failed to initialize Sentry", error=str(e))
+    except (RuntimeError, ValueError, TypeError, OSError) as error:
+        logger.error("Failed to initialize Sentry", error=str(error))
         return False
 
 

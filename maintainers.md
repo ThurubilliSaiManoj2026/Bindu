@@ -17,7 +17,7 @@ This document outlines the maintainer structure, responsibilities, and processes
 Maintainers are trusted contributors who have demonstrated:
 
 1. **Technical Excellence**
-   - Deep understanding of the Bindu architecture and A2A/AP2/X402 protocols
+   - Deep understanding of the Bindu architecture and A2A/X402 protocols
    - Consistent high-quality code contributions
    - Strong testing and documentation practices
 
@@ -54,7 +54,7 @@ We welcome new maintainers who share our vision for the Internet of Agents. Here
    - Active participation in issue discussions and code reviews
 
 2. **Technical Expertise**
-   - Understanding of agent frameworks (Agno, CrewAI, LangChain, etc.)
+   - Understanding of agent frameworks (AG2, Agno, CrewAI, LangChain, etc.)
    - Knowledge of A2A protocol and DID-based identity systems
    - Familiarity with Python async patterns and FastAPI
 

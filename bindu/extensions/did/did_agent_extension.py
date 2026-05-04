@@ -27,12 +27,16 @@ DID documents, enabling agents to establish trust in a decentralized network.
 
 from __future__ import annotations
 
+import os
+import platform
+
 from datetime import datetime, timezone
 from functools import cached_property
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import base58
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -105,6 +109,60 @@ class DIDAgentExtension:
             f"author={self.author}, agent_name={self.agent_name})"
         )
 
+    @staticmethod
+    def _sanitize_identifier(value: str) -> str:
+        """Sanitize identifier for DID format.
+
+        Converts to lowercase and replaces special characters with underscores.
+
+        Args:
+            value: Identifier to sanitize (e.g., author name, agent name)
+
+        Returns:
+            Sanitized identifier safe for DID format
+        """
+        return value.lower().replace(" ", "_").replace("@", "_at_").replace(".", "_")
+
+    def validate_keys(self) -> None:
+        """Validate that the private and public keys form a valid pair.
+
+        Raises:
+            ValueError: If keys do not match or are invalid.
+        """
+        # Trigger loading of keys
+        priv = self.private_key
+        pub = self.public_key
+
+        # Sign a test message
+        message = b"bindu-key-validation"
+        signature = priv.sign(message)
+
+        try:
+            pub.verify(signature, message)
+        except Exception as e:
+            raise ValueError("Private key does not match public key") from e
+
+    def check_integrity(self) -> None:
+        """Perform full integrity check on DID configuration and keys.
+
+        This validates:
+        1. Key pair matching (private/public key consistency)
+        2. DID Document structure and syntax
+        3. Service endpoint consistency with configured URL
+
+        Raises:
+             ValueError: If any validation checks fail
+        """
+        self.validate_keys()
+
+        from bindu.extensions.did.validation import DIDValidation
+
+        doc = self.get_did_document()
+        is_valid, errors = DIDValidation.validate_did_document(doc)
+
+        if not is_valid:
+            raise ValueError(f"DID Document validation failed: {'; '.join(errors)}")
+
     def _generate_key_pair_data(self) -> tuple[bytes, bytes]:
         """Generate key pair and return PEM data.
 
@@ -160,12 +218,23 @@ class DIDAgentExtension:
         private_pem, public_pem = self._generate_key_pair_data()
 
         # Write keys using Path methods
-        self.private_key_path.write_bytes(private_pem)
-        self.public_key_path.write_bytes(public_pem)
+        if platform.system() == "Windows":
+            # Windows does not enforce POSIX permissions — write directly
+            self.private_key_path.write_bytes(private_pem)
+            self.public_key_path.write_bytes(public_pem)
+        else:
+            # POSIX: use os.open to set permissions atomically on creation
+            fd = os.open(
+                str(self.private_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
+            )
+            with os.fdopen(fd, "wb") as f:
+                f.write(private_pem)
 
-        # Set appropriate file permissions (owner read/write only for private key)
-        self.private_key_path.chmod(0o600)
-        self.public_key_path.chmod(0o644)
+            fd = os.open(
+                str(self.public_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644
+            )
+            with os.fdopen(fd, "wb") as f:
+                f.write(public_pem)
 
         return {
             "private_key_path": str(self.private_key_path),
@@ -272,7 +341,8 @@ class DIDAgentExtension:
             signature_bytes = base58.b58decode(signature)
             self.public_key.verify(signature_bytes, text_bytes)
             return True
-        except Exception:
+        except (InvalidSignature, ValueError, TypeError, UnicodeEncodeError) as error:
+            logger.debug("Signature verification failed", error=str(error))
             return False
 
     @cached_property
@@ -285,18 +355,8 @@ class DIDAgentExtension:
         """
         # Use custom bindu format if author, agent_name, and agent_id provided
         if self.author and self.agent_name and self.agent_id:
-            sanitized_author = (
-                self.author.lower()
-                .replace(" ", "_")
-                .replace("@", "_at_")
-                .replace(".", "_")
-            )
-            sanitized_agent_name = (
-                self.agent_name.lower()
-                .replace(" ", "_")
-                .replace("@", "_at_")
-                .replace(".", "_")
-            )
+            sanitized_author = self._sanitize_identifier(self.author)
+            sanitized_agent_name = self._sanitize_identifier(self.agent_name)
             return f"did:{app_settings.did.method_bindu}:{sanitized_author}:{sanitized_agent_name}:{self.agent_id}"
 
         # Fallback to did:key format with multibase encoding
